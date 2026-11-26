@@ -1,0 +1,502 @@
+{
+  "name": "p06_v1",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c07495db-ebff-4f7b-b5eb-273dd50a3dde",
+      "name": "When chat message received"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        224
+      ],
+      "id": "89b095aa-bc8e-430e-b335-3d69d3614c05",
+      "name": "OpenAI Chat Model"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=User Input : {{ $json.chatInput }}\n---\nWeather Info : {{ $json.output }}\n---\ncurrent Datetime (Asia/Seoul): {{ $now.setZone('Asia/Seoul').toISO() }}",
+        "options": {
+          "systemMessage": "=너는 “구글 캘린더 편집 봇”이다. 모든 응답은 한국어.\nTZ=Asia/Seoul. TODAY={{ $now.setZone('Asia/Seoul').toFormat('yyyy-MM-dd') }}.\n\n핵심 원칙(매우 중요)\n- 캘린더 관련 요청(조회/추가/수정/삭제)은 절대 추측/일반답변을 하지 말고 반드시 Google Calendar 툴을 호출한 결과로만 답한다.\n- 툴 호출이 불가능하거나 실패하면: “캘린더 조회/처리에 실패했습니다” 한 줄만 답한다.\n\n날씨\n- 날씨 판단은 Weather Agent 결과가 있을 때만 사용한다.\n- Weather Agent 결과가 없고, 사용자가 날씨를 언급해도 여기서 날씨 툴을 호출하거나 추론하지 않는다(날씨는 외부에서 처리).\n\n시간\n- start 필수.\n- end 없으면 end = start + 1시간.\n- 캘린더 툴 입력은 ISO8601(+09:00)만.\n\n상대 날짜 계산(고정)\n- this_monday = TODAY가 속한 주의 월요일(Asia/Seoul)\n- next_monday = this_monday + 7일\n- next2_monday = this_monday + 14일\n- 이번주 = [this_monday, next_monday)\n- 다음주 = [next_monday, next2_monday)\n- 다음주 평일 = [next_monday, next_monday+5일)\n\n의도별 “필수 툴” 규칙\nA) 일정 조회(“~일정 알려줘/모두/리스트/뭐 있어/비어있어?”)\n- 반드시 get many events 1회 호출 후, 결과로만 답한다.\n- 사용자가 “상세”를 원하거나 겹침 판단이 필요하면 해당 이벤트만 get an event로 추가 조회한다.\n\nB) 일정 추가/수정\n- 추가/수정 전에 충돌 검사 필수:\n  1) get many events(후보 시간 포함 범위)\n  2) 겹칠 가능성 있으면 get an event로 시간 확정\n  3) 1분이라도 겹치면: “일정이 겹칩니다”만 출력하고 중단\n  4) 안 겹치면 create/update 실행\n\nC) 일정 삭제\n- 대상 식별이 애매하면 get many events로 후보를 먼저 찾고(최소 범위), 필요 시 get an event로 확정 후 delete.\n\n출력\n- 조회 성공: 날짜별로 “YYYY-MM-DD HH:MM~HH:MM 제목” 줄바꿈.\n- 생성/수정 성공: “YYYY-MM-DD HH:MM~HH:MM 제목” 1줄.\n- 충돌: “일정이 겹칩니다”\n- 정보 부족: 필요한 질문 최대 2개만.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1008,
+        0
+      ],
+      "id": "dad5c56b-4b60-4249-97ea-9707252c7345",
+      "name": "Calender Agent"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "user@example.com",
+          "mode": "list",
+          "cachedResultName": "user@example.com"
+        },
+        "returnAll": true,
+        "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('After', ``, 'string') }}",
+        "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Before', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        944,
+        224
+      ],
+      "id": "456d1607-32ed-4385-9a23-06f19a2752b6",
+      "name": "Get many events"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "calendar": {
+          "__rl": true,
+          "value": "user@example.com",
+          "mode": "list",
+          "cachedResultName": "user@example.com"
+        },
+        "eventId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Event_ID', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        1072,
+        224
+      ],
+      "id": "1664208d-b9b7-4b59-82e8-257a0221b5cf",
+      "name": "Get an event"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Create an event in Google Calendar\n\n일정 내용에 맞는 제목",
+        "calendar": {
+          "__rl": true,
+          "value": "user@example.com",
+          "mode": "list",
+          "cachedResultName": "user@example.com"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', ``, 'string') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', ``, 'string') }}",
+        "additionalFields": {
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Description', `일정 상세 내용`, 'string') }}",
+          "guestsCanInviteOthers": true,
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', `내용에 맞는 적절한 일정 제목`, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        1200,
+        224
+      ],
+      "id": "605cb44f-d5ac-4b33-b447-0cf0ee700078",
+      "name": "Create an event"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Update an event in Google Calendar",
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "user@example.com",
+          "mode": "list",
+          "cachedResultName": "user@example.com"
+        },
+        "eventId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Event_ID', ``, 'string') }}",
+        "updateFields": {
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Description', ``, 'string') }}",
+          "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', ``, 'string') }}",
+          "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', ``, 'string') }}",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        1328,
+        224
+      ],
+      "id": "37a21b10-ecb6-4ee2-ab9e-fbcf7d2b6d8e",
+      "name": "Update an event"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "user@example.com",
+          "mode": "list",
+          "cachedResultName": "user@example.com"
+        },
+        "eventId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Event_ID', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        1456,
+        224
+      ],
+      "id": "d5d90b9a-7c13-4f74-ac62-e237aba67a38",
+      "name": "Delete an event"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Makes an HTTP request and returns the response data\n\n너는 앞에서 사용자가 말한 위치를 위도와 경도를 계산하여 아래 query parameters에 각각 넣고\n\n위치의 시간대도 직접 넣어서 결과값을 반환해야 해\n\n\nIf location is missing, use:\nlatitude: 37.5665\nlongitude: 126.9780\ntimezone: Asia/Seoul",
+        "url": "https://api.open-meteo.com/v1/forecast",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "latitude",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters0_Value', `위도`, 'string') }}"
+            },
+            {
+              "name": "longitude",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters1_Value', `경도`, 'string') }}"
+            },
+            {
+              "name": "hourly",
+              "value": "precipitation,temperature_2m"
+            },
+            {
+              "name": "start_date",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters3_Value', `시작 날짜`, 'string') }}"
+            },
+            {
+              "name": "timezone",
+              "value": "Asia/Seoul"
+            },
+            {
+              "name": "end_date",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters5_Value', ``, 'string') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        1728,
+        -288
+      ],
+      "id": "f8dd44f6-4166-4369-ae82-d5d50e2a5354",
+      "name": "weather tool1"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        784,
+        240
+      ],
+      "id": "ed3c831a-a4fc-470e-9166-2c30af472502",
+      "name": "OpenAI Chat Model1"
+    },
+    {
+      "parameters": {
+        "url": "https://api.open-meteo.com/v1/forecast",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "latitude",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters0_Value', `위도`, 'string') }}"
+            },
+            {
+              "name": "longitude",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters1_Value', `경도`, 'string') }}"
+            },
+            {
+              "name": "hourly",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters2_Value', `Can combine multiple options with comma, no space.\nAvailable options: precipitation_probability, apparent_temperature, cloud_cover`, 'string') }}"
+            },
+            {
+              "name": "timezone",
+              "value": "Asia/Seoul"
+            },
+            {
+              "name": "start_date",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters4_Value', `format : YYYY-MM-DD`, 'string') }}"
+            },
+            {
+              "name": "end_date",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters5_Value', `format : YYYY-MM-DD`, 'string') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        384,
+        208
+      ],
+      "id": "ddea65c3-9f04-4c62-9601-7fd48ae1a60e",
+      "name": "Hourly tool"
+    },
+    {
+      "parameters": {
+        "url": "https://api.open-meteo.com/v1/forecast",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "latitude",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters0_Value', `위도`, 'string') }}"
+            },
+            {
+              "name": "longitude",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters1_Value', `경도`, 'string') }}"
+            },
+            {
+              "name": "timezone",
+              "value": "Asia/Seoul"
+            },
+            {
+              "name": "daily",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters3_Value', `\nAvailable Options\nprecipitation_probability_mean, apparent_temperature_mean`, 'string') }}"
+            },
+            {
+              "name": "start_date",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters4_Value', `format: YYYY-MM-DD`, 'string') }}"
+            },
+            {
+              "name": "end_date",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters5_Value', `format: YYYY-MM-DD`, 'string') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        528,
+        208
+      ],
+      "id": "0e0c6ff6-4f4a-4d56-94c7-912ce23c4e30",
+      "name": "daily tool"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=user : {{ $json.chatInput }}\ncurrent Datetime (Asia/Seoul): {{ $now.setZone('Asia/Seoul').toISO() }}",
+        "options": {
+          "systemMessage": "=너는 “날씨 판단 전용 에이전트”다.\n모든 응답은 한국어.\nTZ=Asia/Seoul.\n\n[역할]\n- 사용자 질문에서 날짜를 YYYY-MM-DD로 확정한다.\n- 필요 시 Open-Meteo API를 사용해 날씨 조건을 판단한다.\n- 일정 생성이나 캘린더 규칙은 절대 처리하지 않는다.\n\n[날짜 처리 규칙]\n- 상대 날짜(이번주/다음주/요일 포함)는 Asia/Seoul 기준으로\n  YYYY-MM-DD 하나 또는 날짜 리스트로 변환한다.\n- 계산 결과만 출력하고 설명은 하지 않는다.\n\n[Weather API 사용]\n- 기간 요약 → daily tool\n- 특정 시각 조건(비/기온) → hourly tool\n\n[출력 형식 – 반드시 지켜라]\n날씨 조건이 있는 경우:\n\n{\n  \"target_date\": \"YYYY-MM-DD\",\n  \"target_time\": \"HH:MM\",\n  \"weather_summary\": \"강수확률 10%\",\n  \"condition_ok\": true\n}\n\n날씨만 묻는 경우:\n\n{\n  \"dates\": [\n    { \"date\": \"YYYY-MM-DD\", \"summary\": \"강수확률 10%, 체감기온 2도\" }\n  ]\n}\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        288,
+        0
+      ],
+      "id": "062cb1b1-caa4-463c-aa48-d880b6a3fc2e",
+      "name": "weather agent"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        752,
+        -336
+      ],
+      "id": "7d5baf4d-ff4d-4e3d-821f-e1de6332b27f",
+      "name": "Simple Memory"
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "weather agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "weather agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many events": {
+      "ai_tool": [
+        [
+          {
+            "node": "Calender Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get an event": {
+      "ai_tool": [
+        [
+          {
+            "node": "Calender Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event": {
+      "ai_tool": [
+        [
+          {
+            "node": "Calender Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update an event": {
+      "ai_tool": [
+        [
+          {
+            "node": "Calender Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete an event": {
+      "ai_tool": [
+        [
+          {
+            "node": "Calender Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "weather tool1": {
+      "ai_tool": [
+        []
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Calender Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hourly tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "weather agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "daily tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "weather agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "weather agent": {
+      "main": [
+        [
+          {
+            "node": "Calender Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "weather agent",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Calender Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Seoul",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}
